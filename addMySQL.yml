@@ -1,0 +1,16 @@
+- name: Gestionar MySQL dins Docker
+  hosts: ServeiClients
+
+  vars:
+    container: lamp-mysql8
+    root_password: ""
+  
+  tasks:
+  - name: Executar script SQL dins MySQL Docker
+    command: >
+      docker exec {{ container }} 
+      mysql -uroot -p{{ root_password }} -e 
+      "CREATE DATABASE IF NOT EXISTS {{ db_user }}_db;
+      CREATE USER IF NOT EXISTS '{{ db_user }}'@'%' IDENTIFIED BY '{{ db_pass }}';
+      GRANT ALL PRIVILEGES ON {{ db_user }}_db.* TO '{{ db_user }}'@'%';
+      FLUSH PRIVILEGES;"

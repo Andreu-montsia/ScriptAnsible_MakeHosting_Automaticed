@@ -1,0 +1,24 @@
+- name: Configuració inicial del servidor
+  hosts: ServeiClients
+  become: true
+  
+  tasks:
+    - name: Crear grup sftpusers
+      ansible.builtin.group:
+        name: sftpusers
+        state: present
+
+    - name: Configurar SFTP per grup
+      ansible.builtin.blockinfile:
+        path: /etc/ssh/sshd_config
+        block: |
+          Match Group sftpusers
+            ChrootDirectory /home/%u
+            ForceCommand internal-sftp
+            AllowTcpForwarding no
+            X11Forwarding no
+
+    - name: Reiniciar SSH
+      ansible.builtin.service:
+        name: ssh
+        state: restarted

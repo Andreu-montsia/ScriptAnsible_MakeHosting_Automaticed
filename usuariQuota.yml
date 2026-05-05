@@ -1,0 +1,41 @@
+- name: Creació d'usuari i quota
+  hosts: ServeiClients
+  become: true
+
+  tasks:
+    - name: Crear usuari complet
+      ansible.builtin.user:
+        name: "{{ db_user }}"
+        home: "/home/{{ db_user }}"
+        shell: /usr/sbin/nologin
+        groups: sftpusers
+        create_home: yes
+        password: "{{ db_user | password_hash('sha512') }}"
+
+    - name: Assignar quota a l'usuari
+      ansible.builtin.command: >
+        setquota -u {{ db_user }} 0 {{ quota_blocks }} 0 0 /
+
+    - name: Crear directori public_html
+      ansible.builtin.file:
+        path: "/home/{{ db_user }}/public_html"
+        state: directory
+        owner: "{{ db_user }}"
+        group: "{{ db_user }}"
+        mode: '0755'
+
+    - name: Ajustar permisos del home
+      ansible.builtin.file:
+        path: "/home/{{ db_user }}"
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Crear index.html
+      ansible.builtin.copy:
+        dest: "/home/{{ db_user }}/public_html/index.html"
+        content: "<h1>Benvingut, {{ db_user }}!</h1>"
+        owner: "{{ db_user }}"
+        group: "{{ db_user }}"
+        mode: '0644'
+        

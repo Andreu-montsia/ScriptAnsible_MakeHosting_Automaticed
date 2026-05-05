@@ -1,0 +1,87 @@
+# Ansible MAIN Playbook per Alta de Hosting
+# Created by: [Andreu Gilabert]
+# Date: [23/04/2026]
+
+- name: Recollir variables
+  hosts: localhost
+
+  vars_prompt:
+    - name: db_user
+      prompt: "Introdueix el nom del Client"
+      private: no
+
+    - name: paquet
+      prompt: "Selecciona el paquet (1=Delta Lite 5GB / 2=Delta Pro 20GB / 3=Delta Business 50GB)"
+      private: no
+
+    - name: correud
+      prompt: "Introdueix el correu del Client"
+      private: no
+  
+  tasks:
+    - name: Assignar quota segons paquet
+      ansible.builtin.set_fact:
+        quota_mb: >-
+          {% if paquet == '1' %}5120
+          {% elif paquet == '2' %}20480
+          {% elif paquet == '3' %}51200
+          {% else %}5120{% endif %}
+
+    - name: Calcular quota en blocs
+      ansible.builtin.set_fact:
+        quota_blocks: "{{ (quota_mb | int) * 1024 }}"
+
+    - name: Generar password aleatòria
+      set_fact:
+        db_pass: "{{ lookup('password', '/dev/null length=16 chars=ascii_letters,digits,punctuation') }}"
+
+
+  
+    - name: Passar variable al grup WindowsServer
+      add_host:
+        name: "{{ item }}"
+        groups: WindowsServer
+        db_user: "{{ db_user }}"
+      loop: "{{ groups['WindowsServer'] }}"
+    
+    - name: Passar variable al grup ProxyI
+      add_host:
+        name: "{{ item }}"
+        groups: ProxyI
+        db_user: "{{ db_user }}"
+      loop: "{{ groups['ProxyI'] }}"
+
+    - name: Passar variable al grup ServeiClients
+      add_host:
+        name: "{{ item }}"
+        groups: ServeiClients
+        db_user: "{{ db_user }}"
+        db_pass: "{{ db_pass }}"
+        quota_blocks: "{{ quota_blocks }}"
+      loop: "{{ groups['ServeiClients'] }}"
+
+    - name: Passar variables a Mail
+      add_host:
+        name: "{{ item }}"
+        correud: "{{ correud }}"
+        db_user: "{{ db_user }}"
+        paquet: "{{ paquet }}"
+        db_pass: "{{ db_pass }}"
+      loop: "{{ groups['Mail'] }}"
+
+
+- name: Creació d'usuari i quota
+  import_playbook: usuariQuota.yml
+  
+- name: Executar MySQL
+  import_playbook: addMySQL.yml
+
+- name: Executar DNS/Web
+  import_playbook: redirecioWeb.yml
+
+- name: Enviar correu de benvinguda
+  import_playbook: enviarMail.yml
+
+
+  
+

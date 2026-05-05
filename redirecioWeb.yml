@@ -1,0 +1,62 @@
+- name: Registre DNS
+  hosts: WindowsServer
+
+  tasks:
+    - name: Afegir registre
+      ansible.windows.win_powershell:
+        script: |
+          Add-DnsServerResourceRecordA -Name "{{ db_user }}" -ZoneName "iemhosting.asix2.iesmontsia.cat" -AllowUpdateAny -IPv4Address "192.168.213.11"
+
+
+- name: Proxy Invers
+  hosts: ProxyI
+  become: yes
+  tasks:
+    - name: Configuració virtualhost
+      ansible.builtin.copy:
+        dest: /etc/apache2/sites-available/{{ db_user }}.conf
+        content: |
+          <VirtualHost *:80>
+              ServerName {{ db_user }}.iemhosting.asix2.iesmontsia.cat
+              ProxyPreserveHost On
+              ProxyPass / http://192.168.114.3:80/
+              ProxyPassReverse / http://192.168.114.3:80/
+          </VirtualHost>
+
+    - name: Habilitar virtualhost
+      ansible.builtin.command:
+        cmd: a2ensite {{ db_user }}.conf
+
+    - name: Recarregar Apache
+      ansible.builtin.service:
+        name: apache2
+        state: reloaded
+
+- name : Redirecció Web
+  hosts: ServeiClients
+  become: yes
+  tasks:
+    - name: Configuració virtualhost
+      ansible.builtin.copy:
+        dest: /etc/apache2/sites-available/{{ db_user }}.conf
+        content: |
+          <VirtualHost *:80>
+              ServerName {{ db_user }}.iemhosting.asix2.iesmontsia.cat
+              DocumentRoot /home/{{ db_user }}/public_html
+              <Directory /home/{{ db_user }}/public_html>
+                  Options Indexes FollowSymLinks
+                  AllowOverride All
+                  Require all granted
+              </Directory>
+              ErrorLog ${APACHE_LOG_DIR}/{{ db_user }}_error.log
+              CustomLog ${APACHE_LOG_DIR}/{{ db_user }}_access.log combined
+          </VirtualHost>
+
+    - name: Habilitar virtualhost
+      ansible.builtin.command:
+        cmd: a2ensite {{ db_user }}.conf
+
+    - name: Recarregar Apache
+      ansible.builtin.service:
+        name: apache2
+        state: reloaded
